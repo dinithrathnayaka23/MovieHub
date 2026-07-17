@@ -1,8 +1,9 @@
 import { useEffect,useState } from 'react'
 import Search from './components/Search.jsx'
-import Spinner from './components/spinner.jsx';
+import Spinner from './components/Spinner.jsx';
 import MovieCard from './components/MovieCard.jsx';
 import { useDebounce } from 'react-use';
+import { getTrendingMovies, updateSearchCount } from './appwrite.js';
 
 const API_BASE_URL='https://api.themoviedb.org/3';
 const API_KEY=import.meta.env.VITE_TMDB_API_KEY;
@@ -14,11 +15,11 @@ const API_OPTIONS={
   }
 }
 
-
 const App = () => {
   const[searchTerm,setSearchTerm]=useState('');
   const [errorMessage,setErrorMessage]= useState('');
   const [movieList,setMovieList]= useState([]);
+  const [trendingMovies,setTrendingMovies]=useState([]);
   const [isLoading,setIsLoading]= useState(false);
   const [debouncedSearchTerm,setdebouncedSearchTerm] = useState('');
 
@@ -47,11 +48,24 @@ const App = () => {
       }
       setMovieList(data.results || []);
 
+      if(query && data.results.length>0){
+        await updateSearchCount(query, data.results[0])
+      }
+
     } catch (error) {
        console.log(`Error fetching movies: ${error}`);
        setErrorMessage('Error fetching movies. Please try again later.');
     } finally{
-      setIsLoading(true);
+      setIsLoading(false);
+    }
+  }
+
+  const loadTrendingMovies = async() => {
+    try {
+      const movies= await getTrendingMovies();
+      setTrendingMovies(movies);
+    } catch (error) {
+      console.log(`Error fetching Trending movies: ${error}`);
     }
   }
 
@@ -59,18 +73,36 @@ const App = () => {
     fetchMovies(debouncedSearchTerm);
   },[debouncedSearchTerm]);
 
+  useEffect(()=>{
+    loadTrendingMovies();
+  },[])
+
   return (
     <main>
         <div className="pattern"/>
         <div className="wrapper">
           <header>
-            <img src='./hero.png' alt='Hero Image'></img>
+            <img src='/hero.png' alt='Hero Image'></img>
             <h1>Find <span className="text-gradient">Movies</span> You will Enjoy Welcome to MovieHub !</h1>
             <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm}></Search>
           </header>
 
+          {trendingMovies.length>0 && (
+            <section className="trending">
+                <h2>Trending Movies</h2>
+                <ul>
+                  {trendingMovies.map((movie,index)=>(
+                    <li key={movie.$id}>
+                        <p>{index+1}</p>
+                        <img src={movie.poster_url} alt={movie.title}></img>
+                    </li>
+                  ))}
+                </ul>
+            </section>
+          )}
+
           <section className="all-movies">
-              <h2 className="mt-[40px]">All Movies</h2>
+              <h2>All Movies</h2>
               {isLoading ? (
                 <Spinner></Spinner>
               ):errorMessage ? (
